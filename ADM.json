@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Painel ADM</title>
+<style>
+  :root{--bg:#0a0a0f;--accent:#b27fff;--danger:#ff6b6b}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:#fff;font-family:Inter,Arial,sans-serif;display:flex;justify-content:center;align-items:flex-start;padding:14px}
+  .card{width:100%;max-width:420px;background:rgba(20,20,20,0.96);border-radius:12px;border:2px solid var(--accent);padding:14px;box-shadow:0 6px 20px rgba(0,0,0,0.6)}
+  h2{text-align:center;margin:0 0 8px}
+  label{display:block;color:#bdb4ff;font-size:13px;margin-top:8px}
+  input,textarea,button,select{width:100%;padding:8px;margin-top:6px;border-radius:8px;border:1px solid rgba(178,127,255,0.12);background:rgba(0,0,0,0.28);color:#fff;font-size:14px}
+  .code-row{display:flex;gap:6px}
+  .code-row textarea{flex:1;height:44px;resize:none}
+  .code-row input{flex:1}
+  .code-row select{flex:1}
+  button.primary{background:var(--accent);color:#000;border:none;height:42px;font-weight:700;cursor:pointer}
+  .hint{font-size:12px;color:#bdb4ff;text-align:center;margin-top:6px}
+  .keys-container{margin-top:12px;max-height:240px;overflow:auto;border-radius:8px;padding:8px;border:1px solid rgba(178,127,255,0.08);background:rgba(255,255,255,0.02)}
+  .key-item{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;background:rgba(0,0,0,0.25);margin-bottom:8px;gap:8px}
+  .key-left{flex:1;min-width:0}
+  .key-text{font-size:14px;color:#fff;word-break:break-all;line-height:1.1}
+  .meta{font-size:12px;color:#bdb4ff;margin-top:4px}
+  .btns{display:flex;gap:8px}
+  .btn-small{padding:6px 8px;border-radius:8px;border:none;font-size:13px;cursor:pointer}
+  .btn-copy{background:#9b4fff;color:#fff}
+  .btn-del{background:var(--danger);color:#fff}
+  #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;transition:.3s ease}
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="card" role="main">
+  <h2>Painel ADM</h2>
+
+  <label for="keyInput">Key (deixe vazio para gerar aleatória)</label>
+  <input id="keyInput" placeholder="Ex: TESTE123">
+
+  <label for="deviceLimit">Limite de dispositivos</label>
+  <input id="deviceLimit" type="number" min="1" value="2">
+
+  <label>Duração do painel</label>
+  <div class="code-row">
+    <input id="durationValue" type="number" min="1" value="7" placeholder="Ex: 7">
+    <select id="durationUnit">
+      <option value="minutes">Minutos</option>
+      <option value="hours">Horas</option>
+      <option value="days" selected>Dias</option>
+    </select>
+  </div>
+
+  <label>Códigos Headtracking e Otimizador</label>
+  <div class="code-row">
+    <textarea id="codeHead" placeholder="<headtracking>"></textarea>
+    <textarea id="codeOpt" placeholder="<otimizador>"></textarea>
+  </div>
+
+  <label>Códigos Locked (quadril / pescoço / cabeça)</label>
+  <div class="code-row">
+    <textarea id="codeLockedQuadril" placeholder="quadril"></textarea>
+    <textarea id="codeLockedPescoco" placeholder="pescoço"></textarea>
+    <textarea id="codeLockedCabeca" placeholder="cabeça"></textarea>
+  </div>
+
+  <label>Códigos Fov (ligado / desligado)</label>
+  <div class="code-row">
+    <textarea id="codeFovLigado" placeholder="ligado"></textarea>
+    <textarea id="codeFovDesligado" placeholder="desligado"></textarea>
+  </div>
+
+  <button id="generateBtn" class="primary">Gerar Key</button>
+  <div class="hint">Ao não preencher o campo "Key", o sistema gera uma key única automaticamente.</div>
+
+  <h3 style="margin-top:12px">Keys geradas</h3>
+  <div class="keys-container" id="keysList"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1500);
+}
+
+function randString(len=8){
+  const chars='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let s='';for(let i=0;i<len;i++)s+=chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+
+function generateUniqueKey(prefix='KEY-'){
+  const keys=JSON.parse(localStorage.getItem('tempKeys')||'[]').map(k=>k.key);
+  let c;do{c=prefix+randString(8);}while(keys.includes(c));
+  return c;
+}
+
+const keysListEl=document.getElementById('keysList');
+
+async function addKeyOnline(newKey){
+  const resp = await fetch('/add-key', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(newKey)
+  });
+  return resp.json();
+}
+
+function renderKeys(){
+  fetch('/keys')
+    .then(r=>r.json())
+    .then(arr=>{
+      keysListEl.innerHTML='';
+      if(!arr.length){keysListEl.innerHTML='<div style="color:#aaa;text-align:center;padding:10px">Nenhuma key gerada</div>';return;}
+      arr.forEach(k=>{
+        const div=document.createElement('div');
+        div.className='key-item';
+        div.innerHTML=`
+          <div class="key-left">
+            <div class="key-text">${k.key}</div>
+            <div class="meta">limite:${k.devicesAllowed} • expira:${new Date(k.expiry).toLocaleString()}</div>
+          </div>
+        `;
+        keysListEl.appendChild(div);
+      });
+    });
+}
+
+document.getElementById('generateBtn').addEventListener('click', async ()=>{
+  const keyInput=document.getElementById('keyInput').value.trim();
+  const limit=Math.max(1,parseInt(document.getElementById('deviceLimit').value)||1);
+  const codeHead=document.getElementById('codeHead').value;
+  const codeOpt=document.getElementById('codeOpt').value;
+  const locked={
+    quadril:document.getElementById('codeLockedQuadril').value,
+    pescoco:document.getElementById('codeLockedPescoco').value,
+    cabeca:document.getElementById('codeLockedCabeca').value
+  };
+  const fov={
+    ligado:document.getElementById('codeFovLigado').value,
+    desligado:document.getElementById('codeFovDesligado').value
+  };
+  const durationValue = Math.max(1, parseInt(document.getElementById('durationValue').value) || 7);
+  const durationUnit = document.getElementById('durationUnit').value;
+
+  let expiryMs;
+  switch(durationUnit){
+    case 'minutes': expiryMs = durationValue * 60 * 1000; break;
+    case 'hours': expiryMs = durationValue * 60 * 60 * 1000; break;
+    case 'days': expiryMs = durationValue * 24 * 60 * 60 * 1000; break;
+    default: expiryMs = 7 * 24 * 60 * 60 * 1000;
+  }
+
+  const newKey = {
+    key: keyInput||generateUniqueKey(),
+    devicesAllowed: limit,
+    expiry: Date.now() + expiryMs,
+    codes:{head:codeHead,opt:codeOpt,locked,fov}
+  };
+
+  await addKeyOnline(newKey);
+  showToast('✅ Key criada');
+  document.getElementById('keyInput').value='';
+  renderKeys();
+});
+
+renderKeys();
+</script>
+</body>
+</html>

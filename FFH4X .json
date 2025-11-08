@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>FFH4X 🩸</title>
+<style>
+body { margin:0; font-family: Arial, sans-serif; background:#0a0a0f; color:#fff; display:flex; justify-content:center; align-items:center; height:100vh; overflow:hidden;}
+canvas {position: fixed; inset:0; width:100%; height:100%; z-index:0;}
+.card { background:rgba(20,20,20,0.9); padding:20px; border-radius:12px; min-width:360px; border:2px solid #b27fff; position:relative; z-index:2;}
+input, button, select { padding:8px; margin:4px 0; border-radius:8px; border:1px solid #b27fff; background: rgba(0,0,0,0.3); color:#fff; outline:none;}
+button { background:#b27fff; color:#000; font-weight:700; cursor:pointer; border:2px solid #b27fff;}
+button:hover { background:#9b4fff; border-color:#9b4fff; color:#fff; }
+.option-row { display:flex; gap:12px; justify-content:space-between; margin-top:8px; }
+.label-select { display:block; font-weight:bold; margin:0; }
+.info-box { text-align:left; margin:10px 0 15px 0; font-size:14px; line-height:1.5; color: #fff; }
+#panel { display:none; margin-top:20px; text-align:center; }
+#xmlSnippet { position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+background: rgba(20,20,20,0.1); border: 1px solid #b27fff; border-radius:10px;
+padding:10px; font-family: monospace; font-size:12px; color:rgba(255,255,255,0.1);
+max-width:90%; max-height:120px; overflow-y:auto; display:none; z-index:3;
+transition: all 0.3s ease;}
+#xmlSnippet:hover { background: rgba(20,20,20,0.7); color: #fff; }
+</style>
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+
+<div class="card" id="loginCard" style="display:flex; flex-direction:column; align-items:center; text-align:center;">
+    <h2>Digite sua Key</h2>
+    <input type="text" id="userKey" placeholder="Key" style="text-align:center;">
+    <button id="enterBtn">Entrar</button>
+    <div class="msg" id="loginMsg"></div>
+</div>
+
+<div class="card" id="panel">
+    <h2>FFH4X 🩸</h2>
+    <div class="info-box" id="panelInfo"></div>
+
+    <div class="option-row" style="justify-content:center;">
+        <label><input type="checkbox" id="opt-head"> Headtracking</label>
+        <label><input type="checkbox" id="opt-opt"> Otimizador</label>
+    </div>
+
+    <div class="option-row" style="justify-content:center;">
+        <label class="label-select">Locked:
+            <select id="lockedSelect">
+                <option value="quadril">Quadril</option>
+                <option value="pescoco">Pescoço</option>
+                <option value="cabeca">Cabeça</option>
+            </select>
+        </label>
+
+        <label class="label-select">Fov:
+            <select id="fovSelect">
+                <option value="ligado">Ligado</option>
+                <option value="desligado" selected>Desligado</option>
+            </select>
+        </label>
+    </div>
+
+    <button id="applyBtn">Aplicar</button>
+</div>
+
+<div id="xmlSnippet" oncopy="return false;"></div>
+
+<script>
+const enterBtn = document.getElementById('enterBtn');
+const userKeyInput = document.getElementById('userKey');
+const loginMsg = document.getElementById('loginMsg');
+const loginCard = document.getElementById('loginCard');
+const panel = document.getElementById('panel');
+const panelInfo = document.getElementById('panelInfo');
+const xmlSnippet = document.getElementById('xmlSnippet');
+
+const deviceId = localStorage.getItem('deviceId') || ('dev-' + Math.random().toString(36).substring(2,10));
+localStorage.setItem('deviceId', deviceId);
+
+async function getKeysOnline(){
+  const res = await fetch('/keys');
+  return res.json();
+}
+
+enterBtn.addEventListener('click', async () => {
+  const enteredKey = userKeyInput.value.trim();
+  const keys = await getKeysOnline();
+  const now = Date.now();
+  const keyData = keys.find(k => k.key === enteredKey);
+
+  if(keyData){
+      if(now > keyData.expiry){
+          loginMsg.textContent = '❌ Key expirada';
+          return;
+      }
+
+      keyData.devices = keyData.devices || [];
+      if(!keyData.devices.includes(deviceId)){
+          if(keyData.devices.length >= keyData.devicesAllowed){
+              loginMsg.textContent = '❌ Limite de dispositivos atingido';
+              return;
+          }
+          keyData.devices.push(deviceId);
+          // Aqui poderia salvar de volta se quisesse persistência real
+      }
+
+      const expiryDate = new Date(keyData.expiry);
+      panelInfo.innerHTML = `
+          Data de validade: <span style="color:white;">${expiryDate.toLocaleString()}</span><br>
+          Usuário: <span style="color:white;">Suesa</span><br>
+          Status: <span style="color:lime;">Online</span><br>
+          Criador: <span style="color:white;">@NightSens1_</span>
+      `;
+
+      loginCard.style.display = 'none';
+      panel.style.display = 'block';
+  } else {
+      loginMsg.textContent = '❌ Key inválida';
+      setTimeout(()=> loginMsg.textContent='', 2200);
+      userKeyInput.value = '';
+      userKeyInput.focus();
+  }
+});
+</script>
+
+</body>
+</html>
